@@ -10,5 +10,15 @@ module.exports = {
         auth: false,
       },
     },
+    {
+      method: "POST",
+      path: "/cron-products",
+      handler: "fetch-products.cronProducts",
+      config: {
+        policies: [],
+        middlewares: [],
+        auth: false,
+      },
+    },
   ],
 };

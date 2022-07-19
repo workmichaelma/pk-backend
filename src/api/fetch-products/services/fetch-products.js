@@ -123,7 +123,7 @@ const fetchById = async (id, page = 0, data = null) => {
 };
 
 module.exports = {
-  fetchProducts: async ({ id }) => {
+  fetchProducts: async (id) => {
     const data = await fetchById(id);
     return data;
   },
