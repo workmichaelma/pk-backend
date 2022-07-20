@@ -139,6 +139,9 @@ const db = {
             url: product?.url || "",
             price: product?.price || [],
             brand: product?.brand || [],
+            lowestPriceOf30Days: false,
+            lowestPriceOf7Days: false,
+            lowerPriceThanLastDay: false,
           },
         });
         return dbResult;
@@ -201,6 +204,9 @@ const db = {
             url: product?.url || "",
             price: product?.price || [],
             brand: product?.brand || [],
+            lowestPriceOf30Days: product?.lowestPriceOf30Days || false,
+            lowestPriceOf7Days: product?.lowestPriceOf7Days || false,
+            lowerPriceThanLastDay: product?.lowerPriceThanLastDay || false,
           },
         });
         return dbResult;
