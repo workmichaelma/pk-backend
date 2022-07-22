@@ -7,10 +7,15 @@ const {
   find,
   isString,
   take,
+  slice,
   head,
   get,
   min,
   uniq,
+  isEmpty,
+  isObject,
+  isNumber,
+  isArray,
 } = require("lodash");
 
 const useCustomDate = false;
@@ -190,6 +195,16 @@ const db = {
     },
     product: async (product) => {
       if (!product?.code) return {};
+      let price = {
+        price: product?.price,
+      };
+      if (
+        !product?.price ||
+        !isArray(product.price) ||
+        isEmpty(product.price)
+      ) {
+        price = {};
+      }
       try {
         const dbResult = await strapi.db.query("api::product.product").update({
           where: {
@@ -202,7 +217,7 @@ const db = {
             description: product?.description || "",
             image: product?.image || "",
             url: product?.url || "",
-            price: product?.price || [],
+            ...price,
             brand: product?.brand || [],
             lowestPriceOf30Days: product?.lowestPriceOf30Days || false,
             lowestPriceOf7Days: product?.lowestPriceOf7Days || false,
@@ -307,13 +322,27 @@ const defineAction = async (products) => {
   }
 };
 
-const priceBuilder = (price) => {
+const pricesBuilder = (price, record = []) => {
   try {
-    if (price?.value && price?.quantity) {
-      return {
+    const lastRecordDate = get(head(record), "date");
+    const lastRecordValue = get(head(record), "value");
+    if (
+      price?.value &&
+      price?.quantity &&
+      isNumber(price.value) &&
+      isNumber(price.quantity) &&
+      (lastRecordDate !== __DATE__ ||
+        (lastRecordDate === __DATE__ && lastRecordValue !== price.value))
+    ) {
+      const newPrice = {
         date: __DATE__,
         ...price,
       };
+      if (lastRecordDate === __DATE__ && lastRecordValue !== price.value) {
+        return [newPrice, ...slice(record, 1)];
+      } else {
+        return [newPrice, ...record];
+      }
     } else {
       return null;
     }
@@ -322,17 +351,16 @@ const priceBuilder = (price) => {
   }
 };
 
-const discountBuilder = (price, record) => {
+const discountBuilder = (prices) => {
   try {
-    const priceRecord = get(record, "price", []);
-    const record7Days = map(take(priceRecord, 6), "value");
-    const record30Days = map(take(priceRecord, 29), "value");
-    const recordLastDay = get(head(priceRecord), "value");
-    const today = get(price, "value");
+    const recordLastDay = map(slice(prices, 1, 2), "value");
+    const record7Days = map(slice(prices, 1, 8), "value");
+    const record30Days = map(slice(prices, 1, 31), "value");
+    const today = get(head(prices), "value");
     return {
       lowestPriceOf30Days: min(record30Days) > today,
       lowestPriceOf7Days: min(record7Days) > today,
-      lowerPriceThanLastDay: recordLastDay > today,
+      lowerPriceThanLastDay: min(recordLastDay) > today,
     };
   } catch (err) {
     console.log({ err });
@@ -343,28 +371,31 @@ const discountBuilder = (price, record) => {
 const actionBuilder = {
   insert: async (product) => {
     try {
-      return {
-        ...product,
-        price: [priceBuilder(product.price)],
-      };
+      const prices = pricesBuilder(product.price, []);
+      if (isArray(prices) && !isEmpty(prices)) {
+        return {
+          ...product,
+          price: prices,
+        };
+      } else {
+        return product;
+      }
     } catch (err) {
       console.log({ err });
-      return [];
+      return product;
     }
   },
   update: async ({ product, record }) => {
     try {
-      const price = priceBuilder(product?.price);
-      const prices = [price, ...record?.price];
-
-      if (price) {
+      const prices = pricesBuilder(product?.price, record?.price || []);
+      if (isArray(prices) && !isEmpty(prices)) {
         return {
           ...product,
           price: prices,
-          ...discountBuilder(price, record),
+          ...discountBuilder(prices),
         };
       } else {
-        return null;
+        return product;
       }
     } catch (err) {
       console.log({ err });
