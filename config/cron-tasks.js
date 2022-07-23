@@ -4,7 +4,7 @@ module.exports = {
    * Every monday at 1am.
    */
 
-  "0 0 */3 * * *": ({ strapi }) => {
+  "0 */3 * * * *": ({ strapi }) => {
     strapi.api["fetch-products"].services["cron-products"].cronProducts(
       "04010000"
     );
