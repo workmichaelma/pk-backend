@@ -194,7 +194,7 @@ const db = {
       }
     },
     product: async (product) => {
-      if (!product?.code) return {};
+      if (!isObject(product) || isEmpty(product) || !product?.code) return {};
       let price = {
         price: product?.price,
       };
@@ -378,11 +378,11 @@ const actionBuilder = {
           price: prices,
         };
       } else {
-        return product;
+        return {};
       }
     } catch (err) {
       console.log({ err });
-      return product;
+      return {};
     }
   },
   update: async ({ product, record }) => {
@@ -395,11 +395,11 @@ const actionBuilder = {
           ...discountBuilder(prices),
         };
       } else {
-        return product;
+        return {};
       }
     } catch (err) {
       console.log({ err });
-      return [];
+      return {};
     }
   },
 };
