@@ -5,9 +5,9 @@ module.exports = {
    */
 
   "*/10 * * * *": ({ strapi }) => {
-    strapi.api["fetch-products"].services["cron-products"].cronProducts(
-      "04010000"
-    );
+    // strapi.api["fetch-products"].services["cron-products"].cronProducts(
+    //   "04010000"
+    // );
     console.log(new Date());
     // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
   },
