@@ -4,11 +4,10 @@ module.exports = {
    * Every monday at 1am.
    */
 
-  "* */1 * * *": ({ strapi }) => {
-    // strapi.api["fetch-products"].services["cron-products"].cronProducts(
-    //   "04010000"
-    // );
-    console.log(new Date());
+  "*/180 * * * *": ({ strapi }) => {
+    strapi.api["fetch-products"].services["cron-products"].cronProducts(
+      "04010000"
+    );
     // Add your own logic here (e.g. send a queue of email, create a database backup, etc.).
   },
 };
