@@ -16,6 +16,14 @@ const {
   isObject,
   isNumber,
   isArray,
+  mean,
+  reduce,
+  flatten,
+  uniqWith,
+  isEqual,
+  findIndex,
+  includes,
+  compact,
 } = require("lodash");
 
 const useCustomDate = false;
@@ -66,7 +74,7 @@ const demo = [
 ];
 
 const customDate = () => {
-  // if (true) return "2022-07-19";
+  // if (true) return "2022-07-27";
   var d = new Date();
   var utc = d.getTime() + d.getTimezoneOffset() * 60000;
   var nd = new Date(utc + 3600000 * 8);
@@ -118,6 +126,24 @@ const db = {
 
       return dbResult;
     },
+    categories: async (categories) => {
+      const where = map(categories, (c) => {
+        return {
+          name: c.name,
+        };
+      });
+
+      const dbResult = await strapi.db
+        .query("api::category.category")
+        .findMany({
+          where: {
+            $or: where,
+          },
+          populate: { categories: true },
+        });
+
+      return dbResult;
+    },
   },
   insert: {
     products: async (products) => {
@@ -147,6 +173,7 @@ const db = {
             lowestPriceOf30Days: false,
             lowestPriceOf7Days: false,
             lowerPriceThanLastDay: false,
+            categories: product?.categories || [],
           },
         });
         return dbResult;
@@ -180,8 +207,70 @@ const db = {
         return {};
       }
     },
+    categories: async (categories) => {
+      try {
+        const requests = await map(categories, async (c) => {
+          return db.insert.category(c);
+        });
+        return Promise.all(requests);
+      } catch (err) {
+        console.log(err);
+        return [];
+      }
+    },
+    category: async (category) => {
+      try {
+        const dbResult = await strapi.db
+          .query("api::category.category")
+          .create({
+            data: {
+              name: category.name,
+              layer: category.layer,
+            },
+          });
+        return dbResult;
+      } catch (err) {
+        console.log({ err });
+        return {};
+      }
+    },
   },
   update: {
+    categories: async (categories) => {
+      try {
+        const requests = await map(categories, async (c) => {
+          return db.update.category(c);
+        });
+        return Promise.all(requests);
+      } catch (err) {
+        console.log(err);
+        return [];
+      }
+    },
+    category: async (category) => {
+      if (!isObject(category) || isEmpty(category) || !category?.name)
+        return {};
+      let data = {};
+      if (isArray(category?.categories) || isEmpty(category?.categories)) {
+        data = {
+          categories: category.categories,
+        };
+      }
+      try {
+        const dbResult = await strapi.db
+          .query("api::category.category")
+          .update({
+            where: {
+              name: category.name,
+            },
+            data,
+          });
+
+        return dbResult;
+      } catch (err) {
+        return {};
+      }
+    },
     products: async (products) => {
       try {
         const requests = await map(products, async (p) => {
@@ -198,12 +287,22 @@ const db = {
       let price = {
         price: product?.price,
       };
+      let categories = {
+        categories: product?.categories,
+      };
       if (
         !product?.price ||
         !isArray(product.price) ||
         isEmpty(product.price)
       ) {
         price = {};
+      }
+      if (
+        !product?.categories ||
+        !isArray(product?.categories) ||
+        !isEmpty(product?.categories)
+      ) {
+        categories = {};
       }
       try {
         const dbResult = await strapi.db.query("api::product.product").update({
@@ -218,6 +317,7 @@ const db = {
             image: product?.image || "",
             url: product?.url || "",
             ...price,
+            ...categories,
             brand: product?.brand || [],
             lowestPriceOf30Days: product?.lowestPriceOf30Days || false,
             lowestPriceOf7Days: product?.lowestPriceOf7Days || false,
@@ -275,6 +375,107 @@ const buildBrands = async (products) => {
   }
 };
 
+const productCategoriesWithLayer = (categoryString) => {
+  if (categoryString) {
+    const categories = categoryString.split(";");
+    return map(categories, (c, layer) => {
+      return {
+        name: c,
+        layer,
+      };
+    });
+  } else {
+    return [];
+  }
+};
+
+const fetchCategories = async (categories) => {
+  try {
+    const dbRecord = await db.find.categories(categories);
+
+    const categoryToInsert = [];
+
+    forEach(categories, (c) => {
+      if (!find(dbRecord, { name: c.name })) {
+        categoryToInsert.push(c);
+      }
+    });
+
+    const newRecord = await db.insert.categories(categoryToInsert);
+
+    return [...dbRecord, ...newRecord];
+  } catch (err) {
+    console.log({ err });
+    return [];
+  }
+};
+
+const updateCategories = async ({ categoryInProducts, dbRecords }) => {
+  let categoryToUpdate = [];
+
+  forEach(categoryInProducts, (categories) => {
+    forEach(categories, (c, layer) => {
+      const category = find(dbRecords, { name: c.name });
+      const childCategory = find(dbRecords, {
+        name: get(categories, `[${layer + 1}].name`),
+      });
+      if (childCategory) {
+        const alreadyIn = includes(category.categories, childCategory.id);
+        if (!alreadyIn) {
+          const categoryInQueueIndex = findIndex(categoryToUpdate, {
+            name: category.name,
+          });
+
+          if (categoryInQueueIndex > -1) {
+            if (
+              !includes(
+                categoryToUpdate[categoryInQueueIndex].categories,
+                childCategory.id
+              )
+            ) {
+              categoryToUpdate[categoryInQueueIndex] = {
+                ...categoryToUpdate[categoryInQueueIndex],
+                categories: [
+                  ...categoryToUpdate[categoryInQueueIndex].categories,
+                  childCategory.id,
+                ],
+              };
+            }
+          } else {
+            categoryToUpdate.push({
+              ...category,
+              categories: [
+                ...get(category, "categories", []),
+                childCategory.id,
+              ],
+            });
+          }
+        }
+      }
+    });
+  });
+  await db.update.categories(categoryToUpdate);
+};
+
+const buildCategories = async (products) => {
+  try {
+    const categoryInProducts = map(products, (p) => {
+      return productCategoriesWithLayer(get(p, "category", ""));
+    });
+    const allCategories = flatten(categoryInProducts);
+    const uniqCategories = uniqWith(allCategories, isEqual);
+
+    const dbRecords = await fetchCategories(uniqCategories);
+
+    await updateCategories({ categoryInProducts, dbRecords });
+
+    return dbRecords;
+  } catch (err) {
+    console.log(err);
+    return [];
+  }
+};
+
 const defineAction = async (products) => {
   const action = {
     update: [],
@@ -284,11 +485,18 @@ const defineAction = async (products) => {
     const dbRecord = await db.find.products(products);
 
     const productBrands = await buildBrands(products);
+    const productCategories = await buildCategories(products);
 
     const request = await map(products, (p) => {
+      const categories = productCategoriesWithLayer(get(p, "category", ""));
       return {
         ...p,
         brand: get(find(productBrands, { code: p?.brand?.code }), "id"),
+        categories: compact(
+          map(categories, (c) => {
+            return get(find(productCategories, { name: c.name }), "id");
+          })
+        ),
       };
     });
 
@@ -358,8 +566,8 @@ const discountBuilder = (prices) => {
     const record30Days = map(slice(prices, 1, 31), "value");
     const today = get(head(prices), "value");
     return {
-      lowestPriceOf30Days: min(record30Days) > today,
-      lowestPriceOf7Days: min(record7Days) > today,
+      lowestPriceOf30Days: mean(record30Days) > today,
+      lowestPriceOf7Days: mean(record7Days) > today,
       lowerPriceThanLastDay: min(recordLastDay) > today,
     };
   } catch (err) {

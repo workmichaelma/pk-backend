@@ -3,7 +3,7 @@
 const axios = require("axios");
 const { v4: uuidv4 } = require("uuid");
 const axiosRetry = require("axios-retry");
-const { map, isArray, isObject, split, get, head } = require("lodash");
+const { map, isArray, isObject, split, get, head, replace } = require("lodash");
 
 axiosRetry(axios, {
   retries: 3,
@@ -57,25 +57,33 @@ const dataBuilder = (data) => {
 };
 
 const productBuilder = (product) => {
-  return {
-    code: product.code,
-    name: product.name,
-    sizeUnit: product.contentSizeUnit,
-    defaultVariantCode: product.defaultVariantCode,
-    description: product.description,
-    price: priceBuilder({
-      price: product?.price || null,
-      markdownPrice: product?.elabMarkDownMemPrice || null,
-      discount: get(product, "elabFirstMultiBuyDatas", []),
-    }),
-    category: split(product?.gtmCategoryPath || "", "、"),
-    image: get(product, "images[0].url", ""),
-    brand: {
-      name: get(product, "masterBrand.name"),
-      code: get(product, "masterBrand.code"),
-    },
-    url: product.url,
-  };
+  try {
+    return {
+      code: product.code,
+      name: product.name,
+      sizeUnit: product.contentSizeUnit,
+      defaultVariantCode: product.defaultVariantCode,
+      description: product.description,
+      price: priceBuilder({
+        price: product?.price || null,
+        markdownPrice: product?.elabMarkDownMemPrice || null,
+        discount: get(product, "elabFirstMultiBuyDatas", []),
+      }),
+      category: replace(
+        replace(product?.gtmCategoryPath || "", /、/g, ";"),
+        /\//g,
+        "+"
+      ),
+      image: get(product, "images[0].url", ""),
+      brand: {
+        name: get(product, "masterBrand.name"),
+        code: get(product, "masterBrand.code"),
+      },
+      url: product.url,
+    };
+  } catch {
+    return {};
+  }
 };
 
 const priceBuilder = ({ price, markdownPrice, discount }) => {
