@@ -24,11 +24,12 @@ const {
   findIndex,
   includes,
   compact,
+  toNumber,
 } = require("lodash");
 
-const useCustomDate = false;
-const realInsert = true;
-const realUpdate = true;
+const useCustomDate = true;
+const realInsert = false;
+const realUpdate = false;
 
 const demo = [
   {
@@ -74,12 +75,12 @@ const demo = [
 ];
 
 const customDate = () => {
-  // if (true) return "2022-07-27";
-  var d = new Date();
-  var utc = d.getTime() + d.getTimezoneOffset() * 60000;
-  var nd = new Date(utc + 3600000 * 8);
-  const str = nd.toLocaleString();
-  return `${str.substr(6, 4)}-${str.substr(3, 2)}-${str.substr(0, 2)}`;
+  if (true) return "2022-08-02";
+  // var d = new Date();
+  // var utc = d.getTime() + d.getTimezoneOffset() * 60000;
+  // var nd = new Date(utc + 3600000 * 8);
+  // const str = nd.toLocaleString();
+  // return `${str.substr(6, 4)}-${str.substr(3, 2)}-${str.substr(0, 2)}`;
 };
 let __DATE__ = customDate();
 
@@ -566,8 +567,8 @@ const discountBuilder = (prices) => {
     const record30Days = map(slice(prices, 1, 31), "value");
     const today = get(head(prices), "value");
     return {
-      lowestPriceOf30Days: mean(record30Days) > today,
-      lowestPriceOf7Days: mean(record7Days) > today,
+      lowestPriceOf30Days: toNumber(mean(record30Days).toFixed(2)) > today,
+      lowestPriceOf7Days: toNumber(mean(record7Days).toFixed(2)) > today,
       lowerPriceThanLastDay: min(recordLastDay) > today,
     };
   } catch (err) {
