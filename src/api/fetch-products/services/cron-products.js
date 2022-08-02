@@ -27,9 +27,9 @@ const {
   toNumber,
 } = require("lodash");
 
-const useCustomDate = true;
-const realInsert = false;
-const realUpdate = false;
+const useCustomDate = false;
+const realInsert = true;
+const realUpdate = true;
 
 const demo = [
   {
